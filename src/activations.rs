@@ -1,4 +1,6 @@
+// src/activations.rs
 use ndarray::prelude::*;
+use serde::{Deserialize, Serialize};
 
 pub trait Activation {
     fn activate(&self, x: f64) -> f64;
@@ -40,6 +42,7 @@ impl Activation for Sigmoid {
 }
 
 // Enum para representar os diferentes tipos de ativação
+#[derive(Serialize, Deserialize, Clone)]
 pub enum ActivationType {
     ReLU,
     Sigmoid,

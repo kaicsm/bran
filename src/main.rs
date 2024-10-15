@@ -1,3 +1,4 @@
+// src/layers.rs
 mod activations;
 mod layers;
 mod model;
@@ -8,12 +9,23 @@ use layers::DenseLayer;
 use model::NeuralNetwork;
 use ndarray::Array1;
 use optimizer::SGD;
+use std::path::Path;
 
 fn main() {
-    // Criação do modelo
-    let mut network = NeuralNetwork::new();
-    network.add_layer(DenseLayer::new(2, 8, ActivationType::ReLU)); // Aumentamos para 8 neurônios
-    network.add_layer(DenseLayer::new(8, 1, ActivationType::Sigmoid));
+    let model_path = "model.json";
+    
+    // Carregar o modelo se o arquivo existir
+    let mut network = if Path::new(model_path).exists() {
+        println!("Carregando o modelo salvo...");
+        NeuralNetwork::load(model_path).expect("Erro ao carregar o modelo")
+    } else {
+        // Caso contrário, crie um novo modelo
+        println!("Criando um novo modelo...");
+        let mut network = NeuralNetwork::new();
+        network.add_layer(DenseLayer::new(2, 8, ActivationType::ReLU)); // Aumentamos para 8 neurônios
+        network.add_layer(DenseLayer::new(8, 1, ActivationType::Sigmoid));
+        network
+    };
 
     // Optimizador
     let optimizer = SGD::new(0.05);
@@ -33,7 +45,7 @@ fn main() {
     ];
 
     // Ciclo de treinamento
-    for epoch in 0..15000 {
+    for epoch in 0..100000 {
         let mut total_loss = 0.0;
         for (input, target) in inputs.iter().zip(targets.iter()) {
             // Forward pass
@@ -64,4 +76,10 @@ fn main() {
         let output = network.forward(input);
         println!("Input: {:?}, Output: {:.4}", input, output[0]);
     }
+
+    // Salvar o modelo após o treinamento
+    println!("\nSalvando o modelo...");
+    network.save(model_path).expect("Erro ao salvar o modelo");
+    println!("Modelo salvo em '{}'", model_path);
 }
+

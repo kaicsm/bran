@@ -2,7 +2,10 @@
 use crate::layers::DenseLayer;
 use crate::optimizer::SGD;
 use ndarray::Array1;
+use serde::{Deserialize, Serialize};
+use std::{fs::File, io::Write, io::Read};
 
+#[derive(Serialize, Deserialize)]
 pub struct NeuralNetwork {
     pub layers: Vec<DenseLayer>,
 }
@@ -10,6 +13,27 @@ pub struct NeuralNetwork {
 impl NeuralNetwork {
     pub fn new() -> Self {
         NeuralNetwork { layers: Vec::new() }
+    }
+
+    pub fn save(&self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+            let serialized = serde_json::to_string(&self)?;
+            let mut file = File::create(filename)?;
+            file.write_all(serialized.as_bytes())?;
+            Ok(())
+    }
+
+    pub fn load(filename: &str) -> Result<NeuralNetwork, Box<dyn std::error::Error>> {
+            let mut file = File::open(filename)?;
+            let mut contents = String::new();
+            file.read_to_string(&mut contents)?;
+            let mut deserialized: NeuralNetwork = serde_json::from_str(&contents)?;
+            
+            // Restaura as ativações nas camadas após desserialização
+            for layer in &mut deserialized.layers {
+                layer.restore_activation();
+            }
+
+            Ok(deserialized)
     }
 
     pub fn add_layer(&mut self, layer: DenseLayer) {
