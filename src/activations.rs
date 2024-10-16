@@ -41,11 +41,22 @@ impl Activation for Sigmoid {
     }
 }
 
+pub struct Linear;
+impl Activation for Linear {
+    fn activate(&self, x: f64) -> f64 {
+        x
+    }
+    fn derivative(&self, _x: f64) -> f64 {
+        1.0
+    }
+}
+
 // Enum para representar os diferentes tipos de ativação
 #[derive(Serialize, Deserialize, Clone)]
 pub enum ActivationType {
     ReLU,
     Sigmoid,
+    Linear,
 }
 
 impl Activation for ActivationType {
@@ -53,6 +64,7 @@ impl Activation for ActivationType {
         match self {
             ActivationType::ReLU => ReLU.activate(x),
             ActivationType::Sigmoid => Sigmoid.activate(x),
+            ActivationType::Linear => Linear.activate(x),
         }
     }
 
@@ -60,20 +72,23 @@ impl Activation for ActivationType {
         match self {
             ActivationType::ReLU => ReLU.derivative(x),
             ActivationType::Sigmoid => Sigmoid.derivative(x),
+            ActivationType::Linear => Linear.derivative(x),
         }
     }
 
     fn activate_array(&self, x: &Array1<f64>) -> Array1<f64> {
         match self {
-            ActivationType::ReLU => ActivationType::ReLU.activate_array(x),
-            ActivationType::Sigmoid => ActivationType::Sigmoid.activate_array(x),
+            ActivationType::ReLU => ReLU.activate_array(x),
+            ActivationType::Sigmoid => Sigmoid.activate_array(x),
+            ActivationType::Linear => Linear.activate_array(x),
         }
     }
 
     fn derivative_array(&self, x: &Array1<f64>) -> Array1<f64> {
         match self {
-            ActivationType::ReLU => ActivationType::ReLU.derivative_array(x),
-            ActivationType::Sigmoid => ActivationType::Sigmoid.derivative_array(x),
+            ActivationType::ReLU => ReLU.derivative_array(x),
+            ActivationType::Sigmoid => Sigmoid.derivative_array(x),
+            ActivationType::Linear => Linear.derivative_array(x),
         }
     }
 }
