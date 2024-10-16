@@ -1,7 +1,7 @@
 // src/model.rs
 use crate::layers::DenseLayer;
-use crate::optimizer::SGD;
-use ndarray::Array1;
+use crate::optimizer::Optimizer;
+use ndarray::{Array2};
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::Write, io::Read};
 
@@ -11,36 +11,41 @@ pub struct NeuralNetwork {
 }
 
 impl NeuralNetwork {
+    /// Cria uma nova rede neural vazia.
     pub fn new() -> Self {
         NeuralNetwork { layers: Vec::new() }
     }
 
+    /// Salva o modelo utilizando a serialização binária `bincode` para melhor performance.
     pub fn save(&self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
-            let serialized = serde_json::to_string(&self)?;
-            let mut file = File::create(filename)?;
-            file.write_all(serialized.as_bytes())?;
-            Ok(())
+        let encoded: Vec<u8> = bincode::serialize(&self)?;
+        let mut file = File::create(filename)?;
+        file.write_all(&encoded)?;
+        Ok(())
     }
 
+    /// Carrega o modelo a partir de um arquivo serializado com `bincode`.
     pub fn load(filename: &str) -> Result<NeuralNetwork, Box<dyn std::error::Error>> {
-            let mut file = File::open(filename)?;
-            let mut contents = String::new();
-            file.read_to_string(&mut contents)?;
-            let mut deserialized: NeuralNetwork = serde_json::from_str(&contents)?;
-            
-            // Restaura as ativações nas camadas após desserialização
-            for layer in &mut deserialized.layers {
-                layer.restore_activation();
-            }
+        let mut file = File::open(filename)?;
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer)?;
+        let mut deserialized: NeuralNetwork = bincode::deserialize(&buffer)?;
+        
+        // Restaura as ativações nas camadas após desserialização
+        for layer in &mut deserialized.layers {
+            layer.restore_activation();
+        }
 
-            Ok(deserialized)
+        Ok(deserialized)
     }
 
+    /// Adiciona uma nova camada à rede neural.
     pub fn add_layer(&mut self, layer: DenseLayer) {
         self.layers.push(layer);
     }
 
-    pub fn forward(&mut self, input: &Array1<f64>) -> Array1<f64> {
+    /// Realiza a passagem forward para um lote de entradas (`Array2<f32>`).
+    pub fn forward(&mut self, input: &Array2<f32>) -> Array2<f32> {
         let mut output = input.clone();
         for layer in &mut self.layers {
             output = layer.forward(&output);
@@ -48,17 +53,14 @@ impl NeuralNetwork {
         output
     }
 
-    pub fn backward(&mut self, output_error: &Array1<f64>, optimizer: &SGD) {
+    /// Realiza a passagem backward para um lote de erros de saída (`Array2<f32>`).
+    /// Atualiza os pesos e vieses utilizando o otimizador fornecido.
+    pub fn backward(&mut self, output_error: &Array2<f32>, optimizer: &mut dyn Optimizer) -> Result<(), Box<dyn std::error::Error>> {
         let mut error = output_error.clone();
         for layer in self.layers.iter_mut().rev() {
-            let (input_error, weight_gradients, bias_gradients) = layer.backward(&error);
-            optimizer.update(
-                &mut layer.weights,
-                &mut layer.biases,
-                &weight_gradients,
-                &bias_gradients,
-            );
-            error = input_error;
+            error = layer.backward(&error, optimizer);
         }
+        Ok(())
     }
 }
+

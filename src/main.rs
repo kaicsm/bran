@@ -1,4 +1,4 @@
-// src/layers.rs
+// src/main.rs
 mod activations;
 mod layers;
 mod model;
@@ -7,12 +7,12 @@ mod optimizer;
 use activations::ActivationType;
 use layers::DenseLayer;
 use model::NeuralNetwork;
-use ndarray::Array1;
 use optimizer::SGD;
+use ndarray::{array, s};
 use std::path::Path;
 
 fn main() {
-    let model_path = "model.json";
+    let model_path = "model.bin";
     
     // Carregar o modelo se o arquivo existir
     let mut network = if Path::new(model_path).exists() {
@@ -28,53 +28,47 @@ fn main() {
     };
 
     // Optimizador
-    let optimizer = SGD::new(0.05);
+    let mut optimizer = SGD::new(0.05, 1e-5);
 
     // Dados de treinamento (exemplo simples: XOR)
-    let inputs = vec![
-        Array1::from(vec![0.0, 0.0]),
-        Array1::from(vec![0.0, 1.0]),
-        Array1::from(vec![1.0, 0.0]),
-        Array1::from(vec![1.0, 1.0]),
+    let inputs = array![
+        [0.0f32, 0.0],
+        [0.0, 1.0],
+        [1.0, 0.0],
+        [1.0, 1.0],
     ];
-    let targets = vec![
-        Array1::from(vec![0.0]),
-        Array1::from(vec![1.0]),
-        Array1::from(vec![1.0]),
-        Array1::from(vec![0.0]),
+
+    let targets = array![
+        [0.0f32],
+        [1.0],
+        [1.0],
+        [0.0],
     ];
 
     // Ciclo de treinamento
     for epoch in 0..100000 {
-        let mut total_loss = 0.0;
-        for (input, target) in inputs.iter().zip(targets.iter()) {
-            // Forward pass
-            let output = network.forward(input);
+        // Forward pass
+        let outputs = network.forward(&inputs);
 
-            // Calculando o erro (perda) - MSE (Mean Squared Error)
-            let error = &output - target;
-            let loss = error.mapv(|e| e.powi(2)).sum();
-            total_loss += loss;
+        // Calculando o erro (perda) - MSE (Mean Squared Error)
+        let errors = &outputs - &targets;
+        let loss = errors.mapv(|e| e.powi(2)).sum() / inputs.nrows() as f32;
 
-            // Backpropagation e atualização dos pesos
-            network.backward(&error, &optimizer);
-        }
+        // Backpropagation e atualização dos pesos
+        network.backward(&errors, &mut optimizer).unwrap();
 
         // A cada 1000 épocas, mostrar a perda
         if epoch % 1000 == 0 {
-            println!(
-                "Epoch {}: Loss = {:.4}",
-                epoch,
-                total_loss / inputs.len() as f64
-            );
+            println!("Epoch {}: Loss = {:.4}", epoch, loss);
         }
     }
 
     // Teste após o treinamento
     println!("\nResultados finais:");
-    for input in &inputs {
-        let output = network.forward(input);
-        println!("Input: {:?}, Output: {:.4}", input, output[0]);
+    for i in 0..inputs.nrows() {
+        let input = inputs.slice(s![i..i+1, ..]).to_owned();  // Cópia da fatia para Array2<f32>
+        let output = network.forward(&input); // Agora passamos a cópia
+        println!("Input: {:?}, Output: {:.4}", input, output[[0, 0]]);
     }
 
     // Salvar o modelo após o treinamento
