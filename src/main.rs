@@ -64,6 +64,11 @@ struct TestResponse {
     predictions: Vec<Vec<f32>>,
 }
 
+#[derive(Serialize, Deserialize)]
+struct FilenameRequest {
+    filename: String,
+}
+
 #[post("/test", data = "<test_request>")]
 fn test_model(
     test_request: Json<TestRequest>,
@@ -95,17 +100,41 @@ fn test_model(
 #[post("/train", data = "<train_request>")]
 fn train(train_request: Json<TrainRequest>, state: &State<AppState>) -> Json<TrainResponse> {
     let train_data = train_request.into_inner();
-    let x_train = ndarray::Array2::from_shape_vec(
-        (train_data.x_train.len(), train_data.x_train[0].len()),
-        train_data.x_train.into_iter().flatten().collect(),
-    )
-    .expect("Erro ao converter x_train");
 
-    let y_train = ndarray::Array2::from_shape_vec(
+    // Validação básica dos dados de treinamento
+    if train_data.x_train.is_empty() || train_data.y_train.is_empty() {
+        return Json(TrainResponse {
+            message: "Dados de treinamento vazios.".to_string(),
+        });
+    }
+
+    let x_train = match ndarray::Array2::from_shape_vec(
+        (train_data.x_train.len(), train_data.x_train[0].len()),
+        train_data.x_train.clone().into_iter().flatten().collect(),
+    ) {
+        Ok(data) => data,
+        Err(_) => {
+            return Json(TrainResponse {
+                message:
+                    "Erro ao converter x_train. Verifique se os dados estão no formato correto."
+                        .to_string(),
+            })
+        }
+    };
+
+    let y_train = match ndarray::Array2::from_shape_vec(
         (train_data.y_train.len(), train_data.y_train[0].len()),
-        train_data.y_train.into_iter().flatten().collect(),
-    )
-    .expect("Erro ao converter y_train");
+        train_data.y_train.clone().into_iter().flatten().collect(),
+    ) {
+        Ok(data) => data,
+        Err(_) => {
+            return Json(TrainResponse {
+                message:
+                    "Erro ao converter y_train. Verifique se os dados estão no formato correto."
+                        .to_string(),
+            })
+        }
+    };
 
     // Construção dinâmica do modelo
     let mut network = NeuralNetwork::new();
@@ -113,8 +142,8 @@ fn train(train_request: Json<TrainRequest>, state: &State<AppState>) -> Json<Tra
         let activation = match layer.activation.as_str() {
             "ReLU" => ActivationType::ReLU,
             "Sigmoid" => ActivationType::Sigmoid,
-            "Tanh" => ActivationType::Tanh, // Agora Tanh está disponível
-            _ => ActivationType::ReLU,      // Valor padrão
+            "Tanh" => ActivationType::Tanh,
+            _ => ActivationType::ReLU, // Valor padrão
         };
         network.add_layer(DenseLayer::new(
             layer.input_size,
@@ -170,11 +199,12 @@ fn get_stats(state: &State<AppState>) -> Json<TrainingStats> {
     Json((*stats).clone()) // Clona o valor interno de TrainingStats
 }
 
-#[post("/save_model", data = "<filename>")]
+#[post("/save_model", data = "<request>")]
 fn save_model(
-    filename: String,
+    request: Json<FilenameRequest>,
     state: &State<AppState>,
 ) -> Result<Json<TrainResponse>, Custom<String>> {
+    let filename = request.filename.clone();
     let network = state.network.lock().unwrap();
     if let Some(ref net) = *network {
         if let Err(e) = net.save(&filename) {
@@ -191,11 +221,12 @@ fn save_model(
     }
 }
 
-#[post("/load_model", data = "<filename>")]
+#[post("/load_model", data = "<request>")]
 fn load_model(
-    filename: String,
+    request: Json<FilenameRequest>,
     state: &State<AppState>,
 ) -> Result<Json<TrainResponse>, Custom<String>> {
+    let filename = request.filename.clone();
     let mut network = state.network.lock().unwrap();
     match NeuralNetwork::load(&filename) {
         Ok(net) => {
