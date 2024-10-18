@@ -127,7 +127,7 @@ impl NeuralNetwork {
         let n_samples = x_train.shape()[0];
 
         for epoch in 0..epochs {
-            // Processa os mini-lotes em paralelo
+            // Itera sobre mini-lotes em paralelo
             (0..n_samples)
                 .into_par_iter()
                 .step_by(batch_size)
@@ -136,30 +136,54 @@ impl NeuralNetwork {
                     let x_batch = x_train.slice(s![i..end, ..]).to_owned();
                     let y_batch = y_train.slice(s![i..end, ..]).to_owned();
 
-                    // Bloqueia o acesso à rede neural para processar o mini-lote
-                    let mut neural_net = neural_net.lock().unwrap();
-
                     // Passagem forward e backward
-                    let output = neural_net.forward(&x_batch);
-                    let error = loss_fn.derivative(&output, &y_batch);
+                    {
+                        let mut neural_net = neural_net.lock().unwrap(); // Escopo do lock é limitado
+                        let output = neural_net.forward(&x_batch);
+                        let error = loss_fn.derivative(&output, &y_batch);
 
-                    // Bloqueia o otimizador para atualizar os pesos
-                    let mut optimizer = optimizer.lock().unwrap();
-                    neural_net.backward(&error, &mut *optimizer).unwrap();
+                        // Atualiza os pesos e vieses
+                        let mut optimizer = optimizer.lock().unwrap();
+                        neural_net.backward(&error, &mut *optimizer).unwrap();
+                    }
                 });
 
-            // Calcula a perda após cada época
-            let mut neural_net = neural_net.lock().unwrap();
-            let output = neural_net.forward(&x_train);
-            let loss = loss_fn.loss(&output, &y_train);
+            // Calcula a perda e a acurácia após a época
+            let (loss, accuracy) = {
+                let mut neural_net = neural_net.lock().unwrap();
+                let output = neural_net.forward(&x_train);
+                let loss = loss_fn.loss(&output, &y_train);
+                let accuracy = calculate_accuracy(&y_train, &output);
+                (loss, accuracy)
+            };
 
             // Atualiza as estatísticas de treinamento
             {
                 let mut stats = stats.lock().unwrap();
-                stats.log_epoch(epoch as f32 + 1.0, loss);
+                stats.log_epoch(epoch as f32 + 1.0, loss, accuracy);
             }
 
-            println!("Epoch {}/{} - Loss: {:.6}", epoch + 1, epochs, loss);
+            println!(
+                "Epoch {}/{} - Loss: {:.6} - Accuracy: {:.4}",
+                epoch + 1,
+                epochs,
+                loss,
+                accuracy
+            );
         }
     }
+}
+
+/// Função para calcular a acurácia entre as saídas previstas e os rótulos reais.
+fn calculate_accuracy(y_true: &Array2<f32>, y_pred: &Array2<f32>) -> f32 {
+    let mut correct = 0;
+    let total = y_true.shape()[0];
+
+    for (true_val, pred_val) in y_true.iter().zip(y_pred.iter()) {
+        if true_val.round() == pred_val.round() {
+            correct += 1;
+        }
+    }
+
+    correct as f32 / total as f32
 }

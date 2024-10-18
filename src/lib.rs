@@ -5,23 +5,15 @@ pub mod layers;
 pub mod loss;
 pub mod model;
 pub mod optimizer;
+pub mod prelude;
 pub mod visualization;
-
-// Re-exporte os itens principais para facilitar o uso
-pub use activations::{Activation, ActivationType};
-pub use layers::DenseLayer;
-pub use loss::{CrossEntropyLoss, Loss, MeanSquaredError};
-pub use model::NeuralNetwork;
-pub use optimizer::{Adam, Optimizer, SGD};
-
-pub use ndarray;
-pub use rand;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use approx::assert_abs_diff_eq;
     use ndarray::{arr1, arr2, array};
+    use prelude::*;
 
     #[test]
     fn test_activation_relu() {
@@ -130,8 +122,8 @@ mod tests {
     fn test_training_stats() {
         use visualization::TrainingStats;
         let mut stats = TrainingStats::new();
-        stats.log_epoch(1.0, 0.5);
-        stats.log_epoch(2.0, 0.3);
+        stats.log_epoch(1.0, 0.5, 0.8);
+        stats.log_epoch(2.0, 0.3, 0.9);
         assert_eq!(stats.epochs, vec![1.0, 2.0]);
         assert_eq!(stats.losses, vec![0.5, 0.3]);
     }
