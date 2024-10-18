@@ -61,9 +61,6 @@ impl Loss for CrossEntropyLoss {
     }
 
     fn derivative(&self, predicted: &Array2<f32>, target: &Array2<f32>) -> Array2<f32> {
-        // Adiciona epsilon para evitar divisão por zero
-        let epsilon = 1e-10;
-        // Calcula o gradiente da entropia cruzada
-        (predicted - target) / ((predicted * (1.0 - predicted)) + epsilon)
+        predicted - target
     }
 }

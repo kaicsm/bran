@@ -1,7 +1,13 @@
 // bran/src/activations.rs
 
 use ndarray::prelude::*;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+
+static RELU: Lazy<ReLU> = Lazy::new(|| ReLU);
+static SIGMOID: Lazy<Sigmoid> = Lazy::new(|| Sigmoid);
+static LINEAR: Lazy<Linear> = Lazy::new(|| Linear);
+static TANH: Lazy<Tanh> = Lazy::new(|| Tanh);
 
 /// Trait que define métodos para funções de ativação.
 /// Implementa o cálculo da função de ativação e sua derivada,
@@ -146,40 +152,40 @@ impl Activation for ActivationType {
     /// Aplica a função de ativação correspondente com base no tipo especificado.
     fn activate(&self, x: f32) -> f32 {
         match self {
-            ActivationType::ReLU => ReLU.activate(x),
-            ActivationType::Sigmoid => Sigmoid.activate(x),
-            ActivationType::Linear => Linear.activate(x),
-            ActivationType::Tanh => Tanh.activate(x),
+            ActivationType::ReLU => RELU.activate(x),
+            ActivationType::Sigmoid => SIGMOID.activate(x),
+            ActivationType::Linear => LINEAR.activate(x),
+            ActivationType::Tanh => TANH.activate(x),
         }
     }
 
     /// Calcula a derivada da função de ativação correspondente com base no tipo.
     fn derivative(&self, x: f32) -> f32 {
         match self {
-            ActivationType::ReLU => ReLU.derivative(x),
-            ActivationType::Sigmoid => Sigmoid.derivative(x),
-            ActivationType::Linear => Linear.derivative(x),
-            ActivationType::Tanh => Tanh.derivative(x),
+            ActivationType::ReLU => RELU.derivative(x),
+            ActivationType::Sigmoid => SIGMOID.derivative(x),
+            ActivationType::Linear => LINEAR.derivative(x),
+            ActivationType::Tanh => TANH.derivative(x),
         }
     }
 
     /// Aplica a função de ativação correspondente a uma matriz (`Array2<f32>`) em paralelo.
     fn activate_array(&self, x: &Array2<f32>) -> Array2<f32> {
         match self {
-            ActivationType::ReLU => ReLU.activate_array(x),
-            ActivationType::Sigmoid => Sigmoid.activate_array(x),
-            ActivationType::Linear => Linear.activate_array(x),
-            ActivationType::Tanh => Tanh.activate_array(x),
+            ActivationType::ReLU => RELU.activate_array(x),
+            ActivationType::Sigmoid => SIGMOID.activate_array(x),
+            ActivationType::Linear => LINEAR.activate_array(x),
+            ActivationType::Tanh => TANH.activate_array(x),
         }
     }
 
     /// Calcula a derivada da função de ativação correspondente para cada elemento de uma matriz (`Array2<f32>`) em paralelo.
     fn derivative_array(&self, x: &Array2<f32>) -> Array2<f32> {
         match self {
-            ActivationType::ReLU => ReLU.derivative_array(x),
-            ActivationType::Sigmoid => Sigmoid.derivative_array(x),
-            ActivationType::Linear => Linear.derivative_array(x),
-            ActivationType::Tanh => Tanh.derivative_array(x),
+            ActivationType::ReLU => RELU.derivative_array(x),
+            ActivationType::Sigmoid => SIGMOID.derivative_array(x),
+            ActivationType::Linear => LINEAR.derivative_array(x),
+            ActivationType::Tanh => TANH.derivative_array(x),
         }
     }
 }
