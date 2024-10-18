@@ -1,4 +1,5 @@
 // src/loss.rs
+
 use ndarray::prelude::*;
 
 /// Trait que define métodos para funções de perda.

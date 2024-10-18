@@ -1,4 +1,5 @@
 // src/optimizer.rs
+
 use ndarray::{Array1, Array2};
 
 /// Trait que define métodos para otimizadores.
@@ -62,7 +63,8 @@ impl Optimizer for SGD {
         _v_b: &mut Array1<f32>,
     ) {
         // Aplicação da regularização L2 apenas nos pesos
-        *weights -= &(weight_grads * self.learning_rate + &(*weights) * self.l2_reg * self.learning_rate);
+        *weights -=
+            &(weight_grads * self.learning_rate + &(*weights) * self.l2_reg * self.learning_rate);
 
         // Atualização dos vieses sem regularização L2
         *biases -= &(bias_grads * self.learning_rate);
@@ -145,4 +147,3 @@ impl Optimizer for Adam {
         *biases -= &(m_b_hat * self.learning_rate / (v_b_hat.mapv(|v| v.sqrt()) + self.epsilon));
     }
 }
-

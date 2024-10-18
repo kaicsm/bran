@@ -1,4 +1,5 @@
-// src/model.rs
+// bran/src/model.rs
+
 use crate::layers::DenseLayer;
 use crate::loss::Loss; // Importa o trait Loss
 use crate::optimizer::Optimizer;

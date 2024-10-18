@@ -1,4 +1,5 @@
 // src/layers.rs
+
 use crate::activations::{Activation, ActivationType};
 use ndarray::{Array1, Array2, Axis};
 use rand::distributions::{Distribution, Uniform};
@@ -22,13 +23,13 @@ pub struct DenseLayer {
 
     #[serde(skip)] // Estado do otimizador Adam
     pub m_w: Array2<f32>,
-    
+
     #[serde(skip)] // Estado do otimizador Adam
     pub v_w: Array2<f32>,
-    
+
     #[serde(skip)] // Estado do otimizador Adam
     pub m_b: Array1<f32>,
-    
+
     #[serde(skip)] // Estado do otimizador Adam
     pub v_b: Array1<f32>,
 }
@@ -154,4 +155,3 @@ impl<'de> Deserialize<'de> for DenseLayer {
         Ok(layer)
     }
 }
-
