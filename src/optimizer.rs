@@ -2,20 +2,20 @@
 
 use ndarray::{Array1, Array2, Zip};
 
-/// Trait que define métodos para otimizadores.
+/// Define a interface para otimizadores que ajustam pesos e vieses durante o treinamento de redes neurais.
 pub trait Optimizer {
-    /// Atualiza os pesos e vieses utilizando os gradientes e estados do otimizador.
+    /// Atualiza os pesos e vieses da camada com base nos gradientes e momentos fornecidos.
     ///
     /// # Parâmetros
     ///
-    /// - `weights`: Referência mutável para os pesos da camada.
-    /// - `biases`: Referência mutável para os vieses da camada.
-    /// - `weight_grads`: Referência aos gradientes dos pesos.
-    /// - `bias_grads`: Referência aos gradientes dos vieses.
-    /// - `m_w`: Referência mutável para o momento m dos pesos.
-    /// - `v_w`: Referência mutável para o momento v dos pesos.
-    /// - `m_b`: Referência mutável para o momento m dos vieses.
-    /// - `v_b`: Referência mutável para o momento v dos vieses.
+    /// - `weights`: Matriz de pesos.
+    /// - `biases`: Vetor de vieses.
+    /// - `weight_grads`: Gradientes dos pesos.
+    /// - `bias_grads`: Gradientes dos vieses.
+    /// - `m_w`: Momento m dos pesos.
+    /// - `v_w`: Momento v dos pesos.
+    /// - `m_b`: Momento m dos vieses.
+    /// - `v_b`: Momento v dos vieses.
     fn update(
         &mut self,
         weights: &mut Array2<f32>,
@@ -29,13 +29,14 @@ pub trait Optimizer {
     );
 }
 
-/// Estrutura para o otimizador SGD com regularização L2.
+/// Otimizador SGD (Stochastic Gradient Descent) com suporte para regularização L2.
 pub struct SGD {
     pub learning_rate: f32,
     pub l2_reg: f32,
 }
 
 impl SGD {
+    /// Cria uma nova instância do SGD.
     pub fn new(learning_rate: f32, l2_reg: f32) -> Self {
         SGD {
             learning_rate,
@@ -56,29 +57,30 @@ impl Optimizer for SGD {
         _m_b: &mut Array1<f32>,
         _v_b: &mut Array1<f32>,
     ) {
-        // Aplicação da regularização L2 nos pesos usando `Zip` para paralelismo
+        // Atualiza pesos com regularização L2
         Zip::from(weights).and(weight_grads).par_for_each(|w, &wg| {
             *w -= self.learning_rate * (wg + self.l2_reg * *w);
         });
 
-        // Atualização dos vieses sem regularização L2 usando `Zip` para paralelismo
+        // Atualiza vieses
         Zip::from(biases).and(bias_grads).par_for_each(|b, &bg| {
             *b -= self.learning_rate * bg;
         });
     }
 }
 
-/// Estrutura para o otimizador Adam com regularização L2.
+/// Otimizador Adam (Adaptive Moment Estimation) com suporte para regularização L2.
 pub struct Adam {
     pub learning_rate: f32,
     pub beta1: f32,
     pub beta2: f32,
     pub epsilon: f32,
     pub l2_reg: f32,
-    pub t: usize, // Passo de tempo para correção de viés
+    pub t: usize, // Contador de iterações
 }
 
 impl Adam {
+    /// Cria uma nova instância do otimizador Adam.
     pub fn new(learning_rate: f32, beta1: f32, beta2: f32, epsilon: f32, l2_reg: f32) -> Self {
         Adam {
             learning_rate,
@@ -103,9 +105,9 @@ impl Optimizer for Adam {
         m_b: &mut Array1<f32>,
         v_b: &mut Array1<f32>,
     ) {
-        self.t += 1; // Incrementa o passo de tempo
+        self.t += 1; // Incrementa o contador de iterações
 
-        // Atualiza momentos para pesos usando Zip
+        // Atualiza os momentos dos pesos
         Zip::from(m_w.view_mut())
             .and(weight_grads.view())
             .par_for_each(|mw, &wg| {
@@ -117,7 +119,7 @@ impl Optimizer for Adam {
                 *vw = self.beta2 * *vw + (1.0 - self.beta2) * wg * wg;
             });
 
-        // Atualiza momentos para vieses usando Zip
+        // Atualiza os momentos dos vieses
         Zip::from(m_b.view_mut())
             .and(bias_grads.view())
             .par_for_each(|mb, &bg| {
@@ -138,7 +140,7 @@ impl Optimizer for Adam {
         let m_b_hat = &*m_b / bias_correction1;
         let v_b_hat = &*v_b / bias_correction2;
 
-        // Atualiza pesos com regularização L2 usando Zip
+        // Atualiza os pesos com regularização L2
         Zip::from(weights.view_mut())
             .and(m_w_hat.view())
             .and(v_w_hat.view())
@@ -147,7 +149,7 @@ impl Optimizer for Adam {
                     + self.l2_reg * self.learning_rate * *w;
             });
 
-        // Atualiza vieses sem regularização L2 usando Zip
+        // Atualiza os vieses
         Zip::from(biases.view_mut())
             .and(m_b_hat.view())
             .and(v_b_hat.view())
