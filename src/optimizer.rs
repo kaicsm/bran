@@ -1,6 +1,6 @@
 // bran/src/optimizer.rs
 
-use ndarray::{Array1, Array2};
+use ndarray::{Array1, Array2, Zip};
 
 /// Trait que define métodos para otimizadores.
 pub trait Optimizer {
@@ -29,19 +29,13 @@ pub trait Optimizer {
     );
 }
 
-/// Estrutura para o otimizador SGD (Stochastic Gradient Descent) com regularização L2.
+/// Estrutura para o otimizador SGD com regularização L2.
 pub struct SGD {
     pub learning_rate: f32,
     pub l2_reg: f32,
 }
 
 impl SGD {
-    /// Cria um novo otimizador SGD com a taxa de aprendizado e regularização L2 configuráveis.
-    ///
-    /// # Parâmetros
-    ///
-    /// - `learning_rate`: Taxa de aprendizado para as atualizações dos parâmetros.
-    /// - `l2_reg`: Fator de regularização L2 para evitar overfitting.
     pub fn new(learning_rate: f32, l2_reg: f32) -> Self {
         SGD {
             learning_rate,
@@ -57,18 +51,20 @@ impl Optimizer for SGD {
         biases: &mut Array1<f32>,
         weight_grads: &Array2<f32>,
         bias_grads: &Array1<f32>,
-        _m_w: &mut Array2<f32>, // SGD não utiliza momentos
+        _m_w: &mut Array2<f32>,
         _v_w: &mut Array2<f32>,
         _m_b: &mut Array1<f32>,
         _v_b: &mut Array1<f32>,
     ) {
-        // Aplicação da regularização L2 apenas nos pesos
-        // A atualização dos pesos inclui o termo de regularização L2
-        *weights -=
-            &(weight_grads * self.learning_rate + &(*weights) * self.l2_reg * self.learning_rate);
+        // Aplicação da regularização L2 nos pesos usando `Zip` para paralelismo
+        Zip::from(weights).and(weight_grads).par_for_each(|w, &wg| {
+            *w -= self.learning_rate * (wg + self.l2_reg * *w);
+        });
 
-        // Atualização dos vieses sem regularização L2
-        *biases -= &(bias_grads * self.learning_rate);
+        // Atualização dos vieses sem regularização L2 usando `Zip` para paralelismo
+        Zip::from(biases).and(bias_grads).par_for_each(|b, &bg| {
+            *b -= self.learning_rate * bg;
+        });
     }
 }
 
@@ -83,16 +79,6 @@ pub struct Adam {
 }
 
 impl Adam {
-    /// Cria um novo otimizador Adam com parâmetros configuráveis.
-    ///
-    /// # Parâmetros
-    ///
-    /// - `learning_rate`: Taxa de aprendizado para as atualizações dos parâmetros.
-    /// - `beta1`: Fator de decaimento para o momento m.
-    /// - `beta2`: Fator de decaimento para o momento v.
-    /// - `epsilon`: Pequeno valor para evitar divisão por zero.
-    /// - `l2_reg`: Fator de regularização L2 para evitar overfitting.
-    #[allow(dead_code)]
     pub fn new(learning_rate: f32, beta1: f32, beta2: f32, epsilon: f32, l2_reg: f32) -> Self {
         Adam {
             learning_rate,
@@ -119,17 +105,29 @@ impl Optimizer for Adam {
     ) {
         self.t += 1; // Incrementa o passo de tempo
 
-        // Atualiza momentos para pesos
-        *m_w *= self.beta1;
-        *m_w += &(weight_grads * (1.0 - self.beta1));
-        *v_w *= self.beta2;
-        *v_w += &(weight_grads.mapv(|g| g * g) * (1.0 - self.beta2));
+        // Atualiza momentos para pesos usando Zip
+        Zip::from(m_w.view_mut())
+            .and(weight_grads.view())
+            .par_for_each(|mw, &wg| {
+                *mw = self.beta1 * *mw + (1.0 - self.beta1) * wg;
+            });
+        Zip::from(v_w.view_mut())
+            .and(weight_grads.view())
+            .par_for_each(|vw, &wg| {
+                *vw = self.beta2 * *vw + (1.0 - self.beta2) * wg * wg;
+            });
 
-        // Atualiza momentos para vieses
-        *m_b *= self.beta1;
-        *m_b += &(bias_grads * (1.0 - self.beta1));
-        *v_b *= self.beta2;
-        *v_b += &(bias_grads.mapv(|g| g * g) * (1.0 - self.beta2));
+        // Atualiza momentos para vieses usando Zip
+        Zip::from(m_b.view_mut())
+            .and(bias_grads.view())
+            .par_for_each(|mb, &bg| {
+                *mb = self.beta1 * *mb + (1.0 - self.beta1) * bg;
+            });
+        Zip::from(v_b.view_mut())
+            .and(bias_grads.view())
+            .par_for_each(|vb, &bg| {
+                *vb = self.beta2 * *vb + (1.0 - self.beta2) * bg * bg;
+            });
 
         // Correção de viés
         let bias_correction1 = 1.0 - self.beta1.powi(self.t as i32);
@@ -140,12 +138,21 @@ impl Optimizer for Adam {
         let m_b_hat = &*m_b / bias_correction1;
         let v_b_hat = &*v_b / bias_correction2;
 
-        // Atualiza pesos com regularização L2
-        // A atualização dos pesos inclui o termo de regularização L2
-        *weights -= &(m_w_hat * self.learning_rate / (v_w_hat.mapv(|v| v.sqrt()) + self.epsilon)
-            + &(*weights) * self.l2_reg * self.learning_rate);
+        // Atualiza pesos com regularização L2 usando Zip
+        Zip::from(weights.view_mut())
+            .and(m_w_hat.view())
+            .and(v_w_hat.view())
+            .par_for_each(|w, &mw, &vw| {
+                *w -= self.learning_rate * mw / (vw.sqrt() + self.epsilon)
+                    + self.l2_reg * self.learning_rate * *w;
+            });
 
-        // Atualiza vieses sem regularização L2
-        *biases -= &(m_b_hat * self.learning_rate / (v_b_hat.mapv(|v| v.sqrt()) + self.epsilon));
+        // Atualiza vieses sem regularização L2 usando Zip
+        Zip::from(biases.view_mut())
+            .and(m_b_hat.view())
+            .and(v_b_hat.view())
+            .par_for_each(|b, &mb, &vb| {
+                *b -= self.learning_rate * mb / (vb.sqrt() + self.epsilon);
+            });
     }
 }

@@ -21,7 +21,7 @@ pub use rand;
 mod tests {
     use super::*;
     use approx::assert_abs_diff_eq;
-    use ndarray::{arr1, arr2};
+    use ndarray::{arr1, arr2, array};
 
     #[test]
     fn test_activation_relu() {
@@ -76,6 +76,36 @@ mod tests {
         );
         assert_abs_diff_eq!(weights[[0, 0]], 0.999, epsilon = 1e-6);
         assert_abs_diff_eq!(biases[0], 0.0999, epsilon = 1e-6);
+    }
+
+    #[test]
+    fn test_adam_optimizer() {
+        // Configuração inicial
+        let mut weights = array![[0.5, 0.3], [0.7, 0.9]];
+        let mut biases = array![0.1, 0.2];
+        let weight_grads = array![[0.05, 0.02], [0.03, 0.04]];
+        let bias_grads = array![0.01, 0.02];
+        let mut m_w = array![[0.0, 0.0], [0.0, 0.0]];
+        let mut v_w = array![[0.0, 0.0], [0.0, 0.0]];
+        let mut m_b = array![0.0, 0.0];
+        let mut v_b = array![0.0, 0.0];
+
+        // Cria o otimizador Adam
+        let mut adam = Adam::new(0.001, 0.9, 0.999, 1e-8, 0.0);
+
+        // Executa várias atualizações do Adam
+        for _ in 0..10 {
+            adam.update(
+                &mut weights,
+                &mut biases,
+                &weight_grads,
+                &bias_grads,
+                &mut m_w,
+                &mut v_w,
+                &mut m_b,
+                &mut v_b,
+            );
+        }
     }
 
     #[test]
