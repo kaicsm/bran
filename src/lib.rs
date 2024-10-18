@@ -8,10 +8,101 @@ pub mod optimizer;
 pub mod visualization;
 
 // Re-exporte os itens principais para facilitar o uso
-pub use activations::ActivationType;
+pub use activations::{Activation, ActivationType};
 pub use layers::DenseLayer;
+pub use loss::{CrossEntropyLoss, Loss, MeanSquaredError};
 pub use model::NeuralNetwork;
-pub use optimizer::SGD;
+pub use optimizer::{Adam, Optimizer, SGD};
 
 pub use ndarray;
 pub use rand;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_abs_diff_eq;
+    use ndarray::{arr1, arr2};
+
+    #[test]
+    fn test_activation_relu() {
+        let relu = ActivationType::ReLU;
+        assert_eq!(relu.activate(1.0), 1.0);
+        assert_eq!(relu.activate(-1.0), 0.0);
+        assert_eq!(relu.derivative(1.0), 1.0);
+        assert_eq!(relu.derivative(-1.0), 0.0);
+    }
+
+    #[test]
+    fn test_activation_sigmoid() {
+        let sigmoid = ActivationType::Sigmoid;
+        assert_abs_diff_eq!(sigmoid.activate(0.0), 0.5, epsilon = 1e-6);
+        assert_abs_diff_eq!(sigmoid.derivative(0.0), 0.25, epsilon = 1e-6);
+    }
+
+    #[test]
+    fn test_dense_layer() {
+        let mut layer = DenseLayer::new(2, 3, ActivationType::ReLU);
+        let input = arr2(&[[1.0, 2.0]]);
+        let output = layer.forward(&input);
+        assert_eq!(output.shape(), &[1, 3]);
+    }
+
+    #[test]
+    fn test_neural_network() {
+        let mut nn = NeuralNetwork::new();
+        nn.add_layer(DenseLayer::new(2, 3, ActivationType::ReLU));
+        nn.add_layer(DenseLayer::new(3, 1, ActivationType::Sigmoid));
+        let input = arr2(&[[1.0, 2.0]]);
+        let output = nn.forward(&input);
+        assert_eq!(output.shape(), &[1, 1]);
+    }
+
+    #[test]
+    fn test_sgd_optimizer() {
+        let mut sgd = SGD::new(0.01, 0.0);
+        let mut weights = arr2(&[[1.0, 2.0], [3.0, 4.0]]);
+        let mut biases = arr1(&[0.1, 0.2]);
+        let weight_grads = arr2(&[[0.1, 0.2], [0.3, 0.4]]);
+        let bias_grads = arr1(&[0.01, 0.02]);
+        sgd.update(
+            &mut weights,
+            &mut biases,
+            &weight_grads,
+            &bias_grads,
+            &mut arr2(&[[0.0, 0.0], [0.0, 0.0]]),
+            &mut arr2(&[[0.0, 0.0], [0.0, 0.0]]),
+            &mut arr1(&[0.0, 0.0]),
+            &mut arr1(&[0.0, 0.0]),
+        );
+        assert_abs_diff_eq!(weights[[0, 0]], 0.999, epsilon = 1e-6);
+        assert_abs_diff_eq!(biases[0], 0.0999, epsilon = 1e-6);
+    }
+
+    #[test]
+    fn test_mse_loss() {
+        let mse = MeanSquaredError;
+        let predicted = arr2(&[[1.0, 2.0], [3.0, 4.0]]);
+        let target = arr2(&[[1.5, 2.5], [3.5, 4.5]]);
+        let loss = mse.loss(&predicted, &target);
+        assert_abs_diff_eq!(loss, 0.125, epsilon = 1e-6);
+    }
+
+    #[test]
+    fn test_cross_entropy_loss() {
+        let ce = CrossEntropyLoss;
+        let predicted = arr2(&[[0.6, 0.4], [0.3, 0.7]]);
+        let target = arr2(&[[1.0, 0.0], [0.0, 1.0]]);
+        let loss = ce.loss(&predicted, &target);
+        assert_abs_diff_eq!(loss, 0.4337, epsilon = 1e-4);
+    }
+
+    #[test]
+    fn test_training_stats() {
+        use visualization::TrainingStats;
+        let mut stats = TrainingStats::new();
+        stats.log_epoch(1.0, 0.5);
+        stats.log_epoch(2.0, 0.3);
+        assert_eq!(stats.epochs, vec![1.0, 2.0]);
+        assert_eq!(stats.losses, vec![0.5, 0.3]);
+    }
+}

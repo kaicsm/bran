@@ -1,15 +1,15 @@
 // bran/src/model.rs
 
 use crate::layers::DenseLayer;
-use crate::loss::Loss; // Importa o trait Loss
+use crate::loss::Loss;
 use crate::optimizer::Optimizer;
-use crate::visualization::TrainingStats; // Importa TrainingStats para coletar estatísticas
+use crate::visualization::TrainingStats;
 use ndarray::{s, Array2};
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 use std::{fs::File, io::Read, io::Write};
 
-use std::sync::{Arc, Mutex};
-
+/// Estrutura principal que representa uma rede neural.
 #[derive(Serialize, Deserialize)]
 pub struct NeuralNetwork {
     pub layers: Vec<DenseLayer>,
@@ -49,7 +49,8 @@ impl NeuralNetwork {
         self.layers.push(layer);
     }
 
-    /// Realiza a passagem forward para um lote de entradas (`Array2<f32>`).
+    /// Realiza a passagem forward para um lote de entradas.
+    /// Propaga os dados através de todas as camadas da rede.
     pub fn forward(&mut self, input: &Array2<f32>) -> Array2<f32> {
         let mut output = input.clone();
         for layer in &mut self.layers {
@@ -58,8 +59,8 @@ impl NeuralNetwork {
         output
     }
 
-    /// Realiza a passagem backward para um lote de erros de saída (`Array2<f32>`).
-    /// Atualiza os pesos e vieses utilizando o otimizador fornecido.
+    /// Realiza a passagem backward para um lote de erros de saída.
+    /// Atualiza os pesos e vieses de todas as camadas usando o otimizador fornecido.
     pub fn backward(
         &mut self,
         output_error: &Array2<f32>,
@@ -72,7 +73,16 @@ impl NeuralNetwork {
         Ok(())
     }
 
-    // Adicione `stats: Arc<Mutex<TrainingStats>>` como parâmetro
+    /// Treina a rede neural usando os dados fornecidos.
+    ///
+    /// Parâmetros:
+    /// - `x_train`: Dados de entrada para treinamento
+    /// - `y_train`: Rótulos/alvos correspondentes
+    /// - `epochs`: Número de épocas de treinamento
+    /// - `batch_size`: Tamanho do lote para treinamento em mini-lotes
+    /// - `loss_fn`: Função de perda a ser usada
+    /// - `optimizer`: Otimizador para atualização de pesos
+    /// - `stats`: Estrutura para coletar estatísticas de treinamento
     pub fn train(
         &mut self,
         x_train: &Array2<f32>,
@@ -86,22 +96,23 @@ impl NeuralNetwork {
         let n_samples = x_train.shape()[0];
 
         for epoch in 0..epochs {
+            // Itera sobre mini-lotes
             for i in (0..n_samples).step_by(batch_size) {
                 let end = usize::min(i + batch_size, n_samples);
                 let x_batch = x_train.slice(s![i..end, ..]).to_owned();
                 let y_batch = y_train.slice(s![i..end, ..]).to_owned();
 
+                // Realiza a passagem forward e backward para o mini-lote
                 let output = self.forward(&x_batch);
                 let error = loss_fn.derivative(&output, &y_batch);
-
                 self.backward(&error, optimizer).unwrap();
             }
 
-            // Coleta estatísticas ao final de cada época
+            // Calcula e registra a perda ao final de cada época
             let output = self.forward(&x_train);
             let loss = loss_fn.loss(&output, &y_train);
 
-            // Atualiza as estatísticas dentro do Mutex
+            // Atualiza as estatísticas de treinamento
             {
                 let mut stats = stats.lock().unwrap();
                 stats.log_epoch(epoch as f32 + 1.0, loss);

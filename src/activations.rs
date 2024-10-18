@@ -1,4 +1,4 @@
-// src/activations.rs
+// bran/src/activations.rs
 
 use ndarray::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -12,24 +12,28 @@ pub trait Activation: Send + Sync {
     fn derivative(&self, x: f32) -> f32;
 
     /// Aplica a função de ativação a uma matriz (`Array2<f32>`).
+    /// Esta implementação padrão mapeia a função de ativação para cada elemento.
     fn activate_array(&self, x: &Array2<f32>) -> Array2<f32> {
         x.mapv(|elem| self.activate(elem))
     }
 
     /// Calcula a derivada da função de ativação para uma matriz (`Array2<f32>`).
+    /// Esta implementação padrão mapeia a função derivada para cada elemento.
     fn derivative_array(&self, x: &Array2<f32>) -> Array2<f32> {
         x.mapv(|elem| self.derivative(elem))
     }
 }
 
-/// Estrutura para a função de ativação ReLU.
+/// Estrutura para a função de ativação ReLU (Rectified Linear Unit).
 pub struct ReLU;
 
 impl Activation for ReLU {
+    /// Implementa ReLU: f(x) = max(0, x)
     fn activate(&self, x: f32) -> f32 {
         x.max(0.0)
     }
 
+    /// Derivada de ReLU: f'(x) = 1 se x > 0, 0 caso contrário
     fn derivative(&self, x: f32) -> f32 {
         if x > 0.0 {
             1.0
@@ -43,24 +47,28 @@ impl Activation for ReLU {
 pub struct Sigmoid;
 
 impl Activation for Sigmoid {
+    /// Implementa Sigmoid: f(x) = 1 / (1 + e^(-x))
     fn activate(&self, x: f32) -> f32 {
         1.0 / (1.0 + (-x).exp())
     }
 
+    /// Derivada de Sigmoid: f'(x) = f(x) * (1 - f(x))
     fn derivative(&self, x: f32) -> f32 {
         let sig = self.activate(x);
         sig * (1.0 - sig)
     }
 }
 
-/// Estrutura para a função de ativação Tanh.
+/// Estrutura para a função de ativação Tanh (Tangente Hiperbólica).
 pub struct Tanh;
 
 impl Activation for Tanh {
+    /// Implementa Tanh: f(x) = tanh(x)
     fn activate(&self, x: f32) -> f32 {
         x.tanh()
     }
 
+    /// Derivada de Tanh: f'(x) = 1 - tanh^2(x)
     fn derivative(&self, x: f32) -> f32 {
         let tanh_x = self.activate(x);
         1.0 - tanh_x.powi(2)
@@ -71,16 +79,19 @@ impl Activation for Tanh {
 pub struct Linear;
 
 impl Activation for Linear {
+    /// Implementa Linear: f(x) = x
     fn activate(&self, x: f32) -> f32 {
         x // A função linear retorna o próprio valor de entrada
     }
 
+    /// Derivada de Linear: f'(x) = 1
     fn derivative(&self, _x: f32) -> f32 {
         1.0 // A derivada de uma função linear é sempre 1
     }
 }
 
 /// Enum para representar os diferentes tipos de ativação.
+/// Isso permite uma fácil serialização e desserialização.
 #[derive(Serialize, Deserialize, Clone)]
 pub enum ActivationType {
     ReLU,
@@ -89,6 +100,8 @@ pub enum ActivationType {
     Tanh,
 }
 
+// Implementação do trait Activation para ActivationType
+// Isso permite usar ActivationType como uma função de ativação
 impl Activation for ActivationType {
     fn activate(&self, x: f32) -> f32 {
         match self {

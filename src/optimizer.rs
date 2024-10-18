@@ -1,4 +1,4 @@
-// src/optimizer.rs
+// bran/src/optimizer.rs
 
 use ndarray::{Array1, Array2};
 
@@ -63,6 +63,7 @@ impl Optimizer for SGD {
         _v_b: &mut Array1<f32>,
     ) {
         // Aplicação da regularização L2 apenas nos pesos
+        // A atualização dos pesos inclui o termo de regularização L2
         *weights -=
             &(weight_grads * self.learning_rate + &(*weights) * self.l2_reg * self.learning_rate);
 
@@ -116,7 +117,7 @@ impl Optimizer for Adam {
         m_b: &mut Array1<f32>,
         v_b: &mut Array1<f32>,
     ) {
-        self.t += 1;
+        self.t += 1; // Incrementa o passo de tempo
 
         // Atualiza momentos para pesos
         *m_w *= self.beta1;
@@ -140,6 +141,7 @@ impl Optimizer for Adam {
         let v_b_hat = &*v_b / bias_correction2;
 
         // Atualiza pesos com regularização L2
+        // A atualização dos pesos inclui o termo de regularização L2
         *weights -= &(m_w_hat * self.learning_rate / (v_w_hat.mapv(|v| v.sqrt()) + self.epsilon)
             + &(*weights) * self.l2_reg * self.learning_rate);
 
